@@ -77,3 +77,4 @@ for(d in degree) {
 }
 # add lines to previous plot
 lines(degree, cv.error10, type="b",col="red")
+
