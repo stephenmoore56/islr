@@ -61,11 +61,13 @@ reg.summary = summary(regfit.fwd)
 which.min(reg.summary$cp)
 plot(regfit.fwd,
      scale="Cp")
-points(10,reg.summary$cp[10],pch=20,col="red")
-coef(regfit.fwd,10)
 plot(reg.summary$cp,
      xlab="Number of variables",
      ylab="Cp")
+points(10, reg.summary$cp[10],
+       pch=20,
+       col="red")
+coef(regfit.fwd,10)
 ```
 
 ## Model Selection Using a Validation Set
@@ -89,9 +91,10 @@ val.errors = rep(NA,19)
 x.test = model.matrix(Salary ~ .,
                       data = Hitters[-train,])
 for(i in 1:19) {
-  coefi = coef(regfit.fwd,id=i)
+  # coefi = coef(regfit.fwd,id=i)
+  coefi = coef(reg.fwd,id=i)
   # element-wise multiplication by coefficients
-  pred = x.test[,names(coefi)]%*%coefi
+  pred = x.test[,names(coefi)] %*% coefi
   val.errors[i]=mean((Hitters$Salary[-train]-pred)^2)
 }
 sqrt(val.errors)
@@ -100,7 +103,7 @@ plot(sqrt(val.errors),
      ylim=c(250,400),
      pch=19,
      type="b")
-points(sqrt(regfit.fwd$rss[-1]/180),
+points(sqrt(reg.fwd$rss[-1]/180),
        col="blue",
        pch=19,
        type="b")
@@ -111,9 +114,9 @@ legend("topright",
 
 predict.regsubsets = function(object,newdata,id,...) {
   form = as.formula(object$call[[2]])
-  mat=model.matrix(form,newdata)
+  mat=model.matrix(form, newdata)
   coefi=coef(object,id=id)
-  mat[,names(coefi)]%*%coefi
+  mat[,names(coefi)] %*% coefi
 }
 ```
 
@@ -140,6 +143,59 @@ plot(rmse.cv,
      pch=19,
      type="b")
 ```
+
+### Ridge Regression and Lasso
+
+```{r}
+library(glmnet)
+x = model.matrix(Salary ~ ., 
+                 data = Hitters)
+y = Hitters$Salary
+```
+
+### Ridge regression model.
+
+```{r}
+# alpha = 0 is ridge; alpha = 1 is lasso; 
+# between 0 and 1 you get elastic net models
+fit.ridge = glmnet(x, y, alpha = 0)
+plot(fit.ridge, 
+     xvar = "lambda",
+     label = TRUE)
+# 10-fold cross-validation by default
+cv.ridge = cv.glmnet(x, y, alpha = 0)
+plot(cv.ridge)
+```
+
+### Lasso Model
+
+```{r}
+fit.lasso = glmnet(x,y)
+plot(fit.lasso,
+     xvar = "lambda",
+     label = TRUE)
+plot(fit.lasso,
+     xvar = "dev",
+     label = TRUE)
+cv.lasso = cv.glmnet(x,y)
+plot(cv.lasso)
+coef(cv.lasso)
+```
+
+Train / validation division to select teh "lambda" for the lasso.
+ 
+```{r}
+lasso.tr = glmnet(x[train,],y[train])
+lasso.tr
+pred = predict(lasso.tr, x[-train,])
+dim(pred)
+rmse = sqrt(apply((y[-train] - pred)^2,2,mean))
+plot(log(lasso.tr$lambda), rmse, type="b", xlab="Log(lambda)")
+lam.best = lasso.tr$lambda[order(rmse)[1]]
+lam.best
+coef(lasso.tr,s=lam.best)
+```
+
 
 
 
