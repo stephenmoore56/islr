@@ -1,0 +1,171 @@
+---
+title: "Nonlinear Models"
+author: "Steve Moore"
+date: "January 8, 2016"
+output: html_document
+---
+
+# Non Linear Models
+
+```{r}
+library(ISLR)
+attach(Wage)
+```
+
+## Polynomials
+
+```{r}
+# fit a 4th degree polynomial model
+fit = lm(wage ~ poly(age,degree=4), 
+         data=Wage)
+summary(fit)
+```
+
+```{r}
+# Plotting is not so straightforward
+agelims = range(age)
+age.grid=seq(from=agelims[1], to=agelims[2])
+length(age.grid)
+preds = predict(fit, newdata=list(age=age.grid),
+                se=TRUE)
+se.bands = cbind(preds$fit + 2 * preds$se,
+                 preds$fit - 2 * preds$se)
+length(se.bands)
+plot(age,wage,col="darkgrey")
+lines(age.grid,preds$fit,col="blue",lwd=2)
+matlines(age.grid,se.bands,col="blue",lty=2)
+```
+
+```{r}
+# another way of fitting
+fita = lm(wage ~ age + I(age^2) + I(age^3) + I(age^4), data=Wage)
+summary(fita)
+```
+
+```{r}
+# fitted values are the same, even though coefficients and p-values
+# are different
+plot(fitted(fit),fitted(fita))
+```
+
+```{r}
+# Nested sequence of models
+fita = lm(wage ~ education, data=Wage)
+fitb = lm(wage ~ education + age, data=Wage)
+fitc = lm(wage ~ education + poly(age, degree=2), data=Wage)
+fitd = lm(wage ~ education + poly(age, degree=3), data=Wage)
+anova(fita, fitb, fitc, fitd)
+```
+
+## Polynomial logistic regression
+
+Binary response is wage > 250K.  See band of high wage earners in plot above.
+
+```{r}
+fit = glm(I(wage > 250) ~ poly(age, degree=3), data=Wage,
+          family = binomial)
+summary(fit)
+preds=predict(fit, list(age=age.grid), se=TRUE)
+# tricky; add three numbers to fitted values: 0, -2se, +2se
+se.bands = preds$fit + cbind(fit = 0, 
+                             lower = -2 * preds$se,
+                             upper = 2 * preds$se)
+head(se.bands)
+
+# inverse logit
+prob.bands = exp(se.bands) / (1 + exp(se.bands))
+matplot(age.grid, prob.bands,
+        col="blue", lwd=c(2,1,1), lty=c(1,2,2), type="l",
+        ylim=c(0, 0.1))
+# add a rug
+points(jitter(age),I(wage>250)/10,pch="|,cex=.5")
+```
+
+## Splines
+
+### Fixed-knot Splines
+```{r}
+# cubic splines; function bs()
+library(splines)
+# continuous to third derivative at knots
+fit = lm(wage ~ bs(age, knots=c(25,40,60)), data=Wage)
+fit$df
+plot(age, wage, col="darkgrey")
+lines(age.grid, predict(fit, list(age = age.grid)),
+      col="darkgreen", lwd=2)
+abline(v=c(25,40,60), lty=2, col="darkgreen")
+```
+
+### Smoothing Splines
+
+```{r}
+# df governs wiggliness of line
+fit = smooth.spline(age, wage, df=16)
+lines(fit, col="red", lwd=2)
+```
+
+### LOOCV
+
+Leave-one-out Cross-Validation.  Choose roughness or tuning parameter (df)
+
+```{r}
+fit = smooth.spline(age, wage, cv=TRUE)
+lines(fit, col="blue", lwd=2)
+fit$df
+# 6.8! Much less wiggly than smoothing spline above
+```
+
+## Generalized Additive Models (GAM's)
+
+```{r}
+library(gam)
+# s() is a smoothing spline function
+gam1 = gam(wage ~ s(age, df=4) +
+                  s(year, df=4) +
+                  education,
+           data = Wage)
+# plotting grid
+par(mfrow=c(3,1))
+plot(gam1, se=TRUE)
+par(mfrow=c(1,1))
+```
+
+```{r}
+gam2 = gam(I(wage > 250) ~ s(age, df=4) +
+                           s(year, df=4) +
+                           education,
+           data = Wage,
+           family = binomial)
+par(mfrow=c(3,1))
+plot(gam2)
+par(mfrow=c(1,1))
+```
+
+```{r}
+# another GAM linear in year so we can compare with ANOVA
+gam2a = gam(I(wage > 250) ~ s(age, df=4) +
+                            year +
+                            education,
+           data = Wage,
+           family = binomial)
+par(mfrow=c(3,1))
+plot(gam2a)
+par(mfrow=c(1,1))
+# this says we don't need a non-linear term for year
+anova(gam2, gam2a, test="Chisq")
+```
+
+```{r}
+# natural splines
+lm1 = lm(wage ~ ns(age, df=4) +
+                ns(year, df=4) +
+                education,
+         data = Wage)
+par(mfrow=c(3,1))
+plot.gam(lm1, se=T)
+```
+
+
+
+
+
